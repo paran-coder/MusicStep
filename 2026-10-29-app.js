@@ -10,7 +10,7 @@ const statusText={pending:'분석 대기',review:'검수 필요',auto:'자동 �
 const current=()=>state.tracks.find(t=>t.id===state.selected);
 const secs=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const safeName=name=>name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').slice(0,120)||'track';
-const dated='2026-10-29-MusicStep-v1.4.2';
+const dated='2026-10-29-MusicStep-v1.5.0';
 function notify(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);}
 function setBusy(value){state.busy=value;for(const el of [$('files'),$('import-files'),$('empty-import'),$('load-project'),$('project-file'),$('add-pairs'),$('gap'),$('save-project'),$('analysis-method'),$('analysis-range')])el.disabled=value;$('cancel').hidden=!value||!state.abort;renderList();renderEditor();}
 function badge(status){const el=document.createElement('span');el.className='badge '+(isComplete(status)?'done':status==='error'?'error':['review','dirty'].includes(status)?'review':'');el.textContent=statusText[status]||status;return el;}
@@ -32,12 +32,13 @@ function renderList(){
 function select(id){audio.pause();state.preview=false;state.selected=id;$('opening-boundaries').open=false;if(state.url)URL.revokeObjectURL(state.url);state.url=null;const t=current();if(t){state.url=URL.createObjectURL(t.file);audio.src=state.url;}else{audio.removeAttribute('src');audio.load();}renderList();renderEditor();}
 function renderEditor(){
  const t=current(),disabled=!t||state.busy;
- for(const id of ['analyze-one','preview','start','minus','plus','apply','start-slider','opening-end','second-start'])$(id).disabled=disabled;
+ for(const id of ['analyze-one','preview','start','minus','plus','apply','opening-end','second-start'])$(id).disabled=disabled;
+ $('waveform').setAttribute('aria-disabled',String(disabled));
  $('selected-title').textContent=t?t.file.name:'음악을 선택하세요';$('selected-meta').textContent=t?`${secs(t.duration)} · ${t.srtName} · 원본 파일 보존`:'파형을 보며 첫 가사의 시작을 맞춥니다.';
  $('selected-status').replaceWith(Object.assign(badge(t?.status||'대기'),{id:'selected-status'}));
  $('lyric').textContent=t?t.cues[0].text:'아직 연결된 자막이 없습니다.';$('cue-end').textContent=t?`원본 첫 가사 표시 끝 ${t.cues[0].end.toFixed(2)}초`:'원본 첫 가사 표시 끝 —';
  const max=t?(t.cues[1]?.end??t.duration)-.002:30;
- $('start').value=t?t.draft.toFixed(3):'0';$('start').max=max;$('start-slider').max=max;$('start-slider').value=t?t.draft:0;
+ $('start').value=t?t.draft.toFixed(3):'0';$('start').max=max;
  $('opening-end').value=t?t.draftEnd.toFixed(3):'';$('second-start').value=t?.cues[1]?t.draftSecond.toFixed(3):'';$('second-start').disabled=disabled||!t?.cues[1];
  $('second-lyric').textContent=t?.cues[1]?'두 번째 가사: '+t.cues[1].text:'두 번째 가사 자막 없음';
  const geometry=t?explainOpening(t.cues,{start:t.draft,end:t.draftEnd,secondStart:t.draftSecond},t.duration):null;
@@ -85,22 +86,37 @@ function draw(){
  const line=(time,color,label,y)=>{if(time>end)return;const x=Math.max(1,time/end*width);ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke();ctx.fillStyle=color;ctx.font='12px system-ui';ctx.fillText(label,Math.min(x+5,width-100),y);};
  line(t.cues[0].start,'#a3acb9','원본',18);if(t.candidate!==null)line(t.candidate,'#7eb4ff','감지 '+t.candidate.toFixed(2)+'초',38);line(t.draft,'#fcd535','표시 '+t.draft.toFixed(2)+'초',58);
  if(t.frames?.length){ctx.strokeStyle='#7eb4ff';ctx.beginPath();t.frames.forEach((f,i)=>{const x=f.time/end*width,y=195-f.score*35;if(x>width)return;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});ctx.stroke();}
- if(audio.currentTime<=end){const x=audio.currentTime/end*width;ctx.fillStyle='#edf8ee';ctx.fillRect(x,100,1,100);}
+ const handle=(time,color,y)=>{if(time<0||time>end)return;const x=Math.max(8,Math.min(width-8,time/end*width));ctx.fillStyle=color;ctx.fillRect(x-7,y,14,12);};
+ handle(t.draft,'#fcd535',186);
+ if(audio.currentTime<=end){const x=Math.max(1,Math.min(width-2,audio.currentTime/end*width));ctx.fillStyle='#49dfd2';ctx.fillRect(x-1,0,3,height);handle(audio.currentTime,'#49dfd2',2);}
 }
 function draftChanged(t){t.reviewIssue=null;t.status=t.draft===t.applied&&t.draftEnd===t.appliedEnd&&t.draftSecond===t.appliedSecond?(t.reviewed?(t.appliedStatus||'done'):(t.candidate==null?'pending':'review')):'dirty';state.preview=false;renderList();renderEditor();}
 function setDraft(value){const t=current();if(!t||state.busy)return;if(!Number.isFinite(value))return;t.draft=Math.round(Math.max(0,Math.min((t.cues[1]?.end??t.duration)-.002,value))*1000)/1000;draftChanged(t);}
 $('opening-end').onchange=()=>{const t=current();if(!t||state.busy)return;t.draftEnd=Number($('opening-end').value);draftChanged(t);};
 $('second-start').onchange=()=>{const t=current();if(!t||state.busy)return;t.draftSecond=Number($('second-start').value);draftChanged(t);};
-$('start').onchange=()=>setDraft(Number($('start').value));$('start-slider').oninput=()=>setDraft(Number($('start-slider').value));$('minus').onclick=()=>setDraft(current().draft-.1);$('plus').onclick=()=>setDraft(current().draft+.1);
-let dragging=false,wavePointer=null;
-function updateWaveCursor(){const canvas=$('waveform'),t=current();if(!t||state.busy){dragging=false;canvas.style.cursor='default';return;}const rect=canvas.getBoundingClientRect(),end=waveEnd(t);const near=wavePointer!==null&&rect.width>0&&end>0&&t.draft<=end&&Math.abs(wavePointer-rect.left-Math.max(1,t.draft/end*rect.width))<=8;canvas.style.cursor=dragging||near?'ew-resize':'crosshair';}
-$('waveform').onpointerdown=e=>{if(e.button!==0||!current()||state.busy)return;wavePointer=e.clientX;dragging=true;e.target.setPointerCapture(e.pointerId);movePointer(e);updateWaveCursor();};
-$('waveform').onpointermove=e=>{wavePointer=e.clientX;if(dragging)movePointer(e);updateWaveCursor();};
-$('waveform').onpointerup=e=>{dragging=false;wavePointer=e.clientX;updateWaveCursor();};
-$('waveform').onpointercancel=()=>{dragging=false;wavePointer=null;updateWaveCursor();};
-$('waveform').onlostpointercapture=()=>{dragging=false;updateWaveCursor();};
+$('start').onchange=()=>setDraft(Number($('start').value));$('minus').onclick=()=>setDraft(current().draft-.1);$('plus').onclick=()=>setDraft(current().draft+.1);
+let dragging=null,wavePointer=null;
+function pointerTarget(){
+ const t=current(),rect=$('waveform').getBoundingClientRect();if(!t||!wavePointer)return 'seek';
+ const end=waveEnd(t),x=wavePointer.x-rect.left,y=wavePointer.y-rect.top;
+ const near=time=>time>=0&&time<=end&&Math.abs(x-Math.max(1,time/end*rect.width))<=10;
+ // Separate end handles remain selectable when both lines overlap.
+ if(y<=24)return 'seek';
+ if(y>=174&&near(t.draft))return 'caption';
+ if(near(audio.currentTime))return 'seek';
+ return near(t.draft)?'caption':'seek';
+}
+function updateWaveCursor(){const canvas=$('waveform');if(!current()||state.busy){dragging=null;canvas.style.cursor='default';return;}canvas.style.cursor=dragging||wavePointer&&pointerTarget()==='caption'?'ew-resize':'crosshair';}
+function seekTo(value){const t=current();if(!t||state.busy||!Number.isFinite(value))return;state.preview=false;audio.currentTime=Math.max(0,Math.min(t.duration,value));updateTransport();}
+function movePointer(e){const rect=$('waveform').getBoundingClientRect(),value=(e.clientX-rect.left)/rect.width*waveEnd(current());if(dragging==='caption')setDraft(value);else seekTo(value);}
+$('waveform').onpointerdown=e=>{if(e.button!==0||!current()||state.busy)return;e.preventDefault();e.target.focus({preventScroll:true});wavePointer={x:e.clientX,y:e.clientY};dragging=pointerTarget();e.target.setPointerCapture(e.pointerId);movePointer(e);updateWaveCursor();};
+$('waveform').onpointermove=e=>{wavePointer={x:e.clientX,y:e.clientY};if(dragging)movePointer(e);updateWaveCursor();};
+$('waveform').onpointerup=e=>{if(dragging)movePointer(e);dragging=null;wavePointer={x:e.clientX,y:e.clientY};if(e.target.hasPointerCapture(e.pointerId))e.target.releasePointerCapture(e.pointerId);updateWaveCursor();};
+$('waveform').onpointercancel=()=>{dragging=null;wavePointer=null;updateWaveCursor();};
+$('waveform').onlostpointercapture=()=>{dragging=null;updateWaveCursor();};
 $('waveform').onpointerleave=()=>{if(!dragging){wavePointer=null;updateWaveCursor();}};
-function movePointer(e){const rect=$('waveform').getBoundingClientRect();setDraft((e.clientX-rect.left)/rect.width*waveEnd(current()));}
+$('waveform').onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)&&current()&&!state.busy){e.preventDefault();seekTo(e.key==='Home'?0:e.key==='End'?current().duration:audio.currentTime+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?0.1:1));}};
+document.addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.isComposing||e.defaultPrevented||!current()||state.busy)return;const path=e.composedPath();if(path.some(el=>el instanceof Element&&(el.matches('input,textarea,select,button,a,audio,video,[role="button"],[role="slider"]')||el.isContentEditable)))return;e.preventDefault();if(audio.paused){audio.play().catch(err=>notify('재생할 수 없습니다: '+err.message,true));}else audio.pause();});
 $('wave-range').onchange=draw;new ResizeObserver(draw).observe($('waveform'));
 $('apply').onclick=()=>{try{const t=current();const issue=explainOpening(t.cues,{start:t.draft,end:t.draftEnd,secondStart:t.draftSecond},t.duration);if(issue){notify(issue.title,true);return;}saveReviewedTimes(t);notify(`${t.file.name}: 확인한 가사 자막 표시 시간을 저장했습니다. 세 번째 이후 자막 시간은 그대로입니다.`);}catch(e){notify('가사 자막 표시 시간을 확인해주세요. '+e.message,true);}};
 $('listen-next').onclick=async()=>{const t=current();if(!t?.cues[1]||state.busy)return;try{state.preview=false;audio.currentTime=Math.max(0,t.draft-.6);await audio.play();updateGuidedControls();}catch(e){notify('재생을 시작하지 못했습니다. 음악을 다시 선택한 뒤 재생해주세요. '+e.message,true);}};
@@ -108,8 +124,15 @@ $('mark-next').onclick=()=>{const t=current();if(!t||state.busy)return;try{const
 $('filter-review').onchange=renderList;$('gap').onchange=()=>{const n=Number($('gap').value);if(!Number.isFinite(n)||n<0||n>60){$('gap').value=0;notify('곡 간격은 0~60초로 입력하세요.',true);}renderList();};
 $('next-review').onclick=()=>{const i=state.tracks.findIndex(t=>t.id===state.selected);const rotated=[...state.tracks.slice(i+1),...state.tracks.slice(0,i+1)];const t=rotated.find(t=>!isComplete(t.status));if(t)select(t.id);else notify('모든 곡이 완료됐습니다. 바로 내보낼 수 있습니다.');};
 $('preview').onclick=async()=>{try{const t=current();audio.currentTime=Math.max(0,t.draft-2);state.preview=true;await audio.play();}catch(e){notify('재생할 수 없습니다: '+e.message,true);}};
-audio.ontimeupdate=()=>{$('play-time').textContent=srtTime(audio.currentTime||0).replace(',','.');const t=current();if(state.preview&&t&&audio.currentTime>=Math.min(t.duration,t.draft+3)){if($('loop').checked){audio.currentTime=Math.max(0,t.draft-2);audio.play().catch(()=>{});}else{audio.pause();state.preview=false;}}updateGuidedControls();draw();};
-audio.onplay=updateGuidedControls;audio.onpause=updateGuidedControls;audio.onseeked=updateGuidedControls;
+function updateTransport(){$('play-time').textContent=srtTime(audio.currentTime||0).replace(',','.');const t=current();if(state.preview&&t&&audio.currentTime>=Math.min(t.duration,t.draft+3)){if($('loop').checked){audio.currentTime=Math.max(0,t.draft-2);audio.play().catch(()=>{});}else{audio.pause();state.preview=false;}}updateGuidedControls();draw();}
+let playbackFrame=0;
+function animatePlayback(){cancelAnimationFrame(playbackFrame);updateTransport();if(!audio.paused&&!audio.ended)playbackFrame=requestAnimationFrame(animatePlayback);}
+audio.ontimeupdate=updateTransport;
+audio.onplay=animatePlayback;
+audio.onpause=()=>{cancelAnimationFrame(playbackFrame);updateTransport();};
+audio.onseeking=()=>{const t=current();if(state.preview&&t&&Math.abs(audio.currentTime-Math.max(0,t.draft-2))>0.05)state.preview=false;updateTransport();};
+audio.onseeked=updateTransport;
+audio.onloadedmetadata=updateTransport;audio.onemptied=updateTransport;
 audio.onended=()=>{if(state.preview&&$('loop').checked&&current()){audio.currentTime=Math.max(0,current().draft-2);audio.play().catch(()=>{});}updateGuidedControls();};
 function decodeText(bytes){let text=new TextDecoder('utf-8',{fatal:false}).decode(bytes);if(text.includes('\uFFFD')){try{text=new TextDecoder('euc-kr',{fatal:true}).decode(bytes);}catch{throw Error('SRT 인코딩을 읽을 수 없습니다. UTF-8로 저장하세요.');}}return text;}
 async function addTrack(file,srtFile,saved){

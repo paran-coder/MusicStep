@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 import { wavHeader, pcm16, parseSrt } from './2026-10-29-core.mjs';
-const out=path.resolve('2026-10-29-v1.4.0-test-results');await fs.mkdir(out,{recursive:true});
+const out=path.resolve('../2026-10-29-work/2026-10-29-current-test-results');await fs.mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true,args:['--disable-features=MediaRouter']});
 const context=await browser.newContext({acceptDownloads:true,viewport:{width:1440,height:1050}});
 await context.addInitScript(()=>{window.showSaveFilePicker=undefined;});

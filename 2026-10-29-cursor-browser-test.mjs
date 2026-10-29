@@ -15,7 +15,7 @@ try{
  const r=await wave.boundingBox(),x=r.x+r.width*3/12,y=r.y+80;
  await page.mouse.move(x,y);assert.equal(await cursor(),'ew-resize');checks.push('yellow line: ew-resize');
  await page.mouse.move(x+7,y);assert.equal(await cursor(),'ew-resize');
- await page.mouse.move(x+12,y);assert.equal(await cursor(),'crosshair');checks.push('outside 8px hit area: crosshair');
+ await page.mouse.move(x+12,y);assert.equal(await cursor(),'crosshair');checks.push('outside 10px hit area: crosshair');
  await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(r.x+r.width*.4,y,{steps:5});assert.equal(await cursor(),'ew-resize');assert.ok(Number(await page.locator('#start').inputValue())>4);checks.push('drag moves timestamp and retains resize cursor');
  await page.mouse.move(r.x+r.width+30,y);assert.equal(await cursor(),'ew-resize');checks.push('pointer capture retains cursor outside waveform');
  await page.mouse.up();await page.mouse.move(r.x+20,y);assert.equal(await cursor(),'crosshair');checks.push('release restores hover cursor');
@@ -25,6 +25,6 @@ try{
  assert.equal(await cursor(),'default');await page.locator('#cancel').click();await page.waitForFunction(()=>!document.querySelector('#analyze-one').disabled);checks.push('busy: default; cancellation restores enabled state');
  assert.equal(await page.locator('meta[property="og:image"]').getAttribute('content'),'https://music-step.vercel.app/og-image.png');
  assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://music-step.vercel.app/');checks.push('confirmed deployment domain in OG/canonical');
- const out='2026-10-29-work/2026-10-29-current-test-results';await fs.mkdir(out,{recursive:true});await fs.writeFile(out+'/2026-10-29-cursor-results.json',JSON.stringify({pass:checks.length,checks},null,2));
+ const out='../2026-10-29-work/2026-10-29-current-test-results';await fs.mkdir(out,{recursive:true});await fs.writeFile(out+'/2026-10-29-cursor-results.json',JSON.stringify({pass:checks.length,checks},null,2));
  console.log(JSON.stringify({pass:checks.length,checks},null,2));
 }finally{await browser.close();}
