@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+ <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self'; media-src 'self' blob:; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self'; form-action 'none'">
+ <meta name="referrer" content="no-referrer"><title>MusicStep · 첫 가사부터, 정확하게</title>
+ <meta name="description" content="여러 곡의 첫 보컬을 감지해 SRT 자막 시작을 맞추고, 통합·개별 음악과 자막을 내보내세요. 파일은 브라우저 안에서만 처리합니다.">
+ <meta name="theme-color" content="#0b0e11">
+ <meta property="og:type" content="website">
+ <meta property="og:locale" content="ko_KR">
+ <meta property="og:site_name" content="MusicStep">
+ <meta property="og:title" content="MusicStep · 플레이리스트 자막 맞추기">
+ <meta property="og:description" content="첫 가사부터, 정확하게. 보컬 시작 감지부터 음악·SRT 내보내기까지, 브라우저 안에서.">
+ <meta property="og:image" content="/og-image.png">
+ <meta property="og:image:type" content="image/png">
+ <meta property="og:image:width" content="1200">
+ <meta property="og:image:height" content="630">
+ <meta property="og:image:alt" content="MusicStep — 첫 가사부터, 정확하게. 플레이리스트 자막 맞추기">
+ <meta name="twitter:card" content="summary_large_image">
+ <meta name="twitter:title" content="MusicStep · 플레이리스트 자막 맞추기">
+ <meta name="twitter:description" content="첫 보컬 감지와 SRT 자막 정렬. 음악과 자막은 브라우저 안에서만 처리합니다.">
+ <meta name="twitter:image" content="/og-image.png">
+ <meta name="twitter:image:alt" content="MusicStep — 첫 가사부터, 정확하게. 플레이리스트 자막 맞추기">
+ <link rel="stylesheet" href="/2026-10-29-ui-v1.3.0.css"><link rel="stylesheet" href="/2026-10-29-guided-v1.4.0.css"><script type="module" src="/2026-10-29-app.js"></script>
+</head>
+<body>
+ <header class="topbar"><a class="brand" href="/" aria-label="MusicStep 홈"><span class="mark">m<span>▮</span></span>MusicStep <small>v1.4.1</small></a><span class="privacy"><i></i> 브라우저 안에서만 처리</span><button id="save-project" class="quiet">작업 저장</button><button id="load-project" class="quiet">작업 열기</button></header>
+ <main>
+  <section class="intro"><div><h1>플레이리스트 자막 맞추기</h1><p>음악과 자막을 추가한 뒤 전체 분석을 누르세요. 정상 곡은 자동 수정하고, 확인이 필요한 곡만 알려드립니다.</p></div><button id="import-files" class="primary">＋ 음악·SRT 불러오기</button><input id="files" type="file" multiple accept="audio/*,.srt,.flac,.m4a,.mp4" hidden></section>
+  <div id="notice" role="status" aria-live="polite">음악과 같은 이름의 SRT를 함께 선택하세요. 원본은 변경하지 않습니다.</div>
+  <section id="pairing" class="panel" hidden><h2>파일 연결 확인</h2><p>파일명이 다르거나 중복된 파일입니다. 음악마다 사용할 자막을 직접 선택하세요.</p><div id="pair-rows"></div><button id="add-pairs" class="primary">선택한 연결 추가</button></section>
+  <div class="workspace" id="drop-zone">
+   <aside class="panel library"><div class="panel-heading"><h2>플레이리스트 <span id="track-count">0</span></h2><button id="next-review" class="quiet">확인할 곡으로 →</button></div><div class="library-tools"><label><input id="filter-review" type="checkbox"> 확인할 곡만 보기</label><span id="summary">준비된 곡 없음</span></div><ol id="tracks"></ol><div id="empty-list"><span class="empty-icon">♫</span><h3>플레이리스트를 채워보세요</h3><p>MP3, WAV 등 음악과 SRT를<br>이곳에 끌어 놓아도 됩니다.</p><button id="empty-import" class="quiet text-button">파일 선택하기 →</button></div><div class="library-footer"><label>곡 사이 간격 <input id="gap" type="number" min="0" max="60" step="0.1" value="0" aria-label="곡 사이 간격"> 초</label><span>순서는 ↑ ↓로 변경</span></div></aside>
+   <section class="panel editor"><div class="editor-head"><div><h2 id="selected-title">음악을 선택하세요</h2><p id="selected-meta">파형을 보며 가사 자막의 표시 시간을 맞춥니다.</p></div><span id="selected-status" class="badge">대기</span></div>
+    <div class="analysis-bar"><label>분석 방식 <select id="analysis-method"><option value="fast">빠른 보컬 감지 (기본)</option><option value="precise">정밀 보컬 분리 (느림)</option></select></label><label>분석 범위 <select id="analysis-range"><option value="30">앞 30초</option><option value="60">앞 60초</option><option value="all">곡 전체</option></select></label><button id="analyze-one" disabled>이 곡 분석</button><button id="analyze-all" class="primary" disabled>전체 분석</button><button id="cancel" class="quiet" hidden>작업 취소</button></div>
+    <div class="result-summary"><div class="result-value"><span>감지한 목소리 시작</span><strong id="detected-time">—</strong></div><p id="result-caption">전체 분석을 누르면 정상 곡은 자동 수정됩니다.</p></div>
+    <div class="wave-controls"><span><i class="legend original"></i>원본 <i class="legend candidate"></i>AI 후보 <i class="legend applied"></i>현재 설정</span><label>파형 범위 <select id="wave-range"><option value="30">앞 30초</option><option value="60">앞 60초</option><option value="all">곡 전체</option></select></label></div>
+    <div class="wave-wrap"><canvas id="waveform" height="200" aria-label="음악 파형. 아래 시작 위치 슬라이더로도 조절할 수 있습니다."></canvas><div id="wave-empty">음악을 불러오면 파형이 나타납니다.</div></div><div id="wave-axis" class="wave-axis"><span>0:00</span><span>0:30</span></div>
+    <div class="transport"><button id="preview" disabled>▶ 시작 전후 듣기</button><label><input id="loop" type="checkbox" checked> 시작 전후 반복</label><span id="play-time">00:00.000</span></div><audio id="audio" controls preload="metadata"></audio>
+    <div class="caption-card"><div class="caption-heading"><span>첫 가사 자막</span><span id="cue-end">원본 첫 가사 표시 끝 —</span></div><p id="lyric">아직 연결된 자막이 없습니다.</p><section id="review-guidance" class="review-guidance" role="status" hidden><h3 id="review-title"></h3><p id="review-message"></p></section><div class="timing"><div><label for="start">첫 가사 표시 시작 (초)</label><div class="time-input"><button id="minus" aria-label="0.1초 앞으로" disabled>−</button><input id="start" type="number" min="0" step="0.001" value="0" disabled><button id="plus" aria-label="0.1초 뒤로" disabled>＋</button></div></div><div><span class="subtle">표시 시작 변경</span><p id="change">음악을 선택하면 변경 내용을 보여드립니다.</p></div><button id="apply" class="primary" disabled>확인한 시간 저장</button></div><input id="start-slider" type="range" min="0" max="30" step="0.001" value="0" disabled aria-label="첫 가사 표시 시작 위치"></div>
+    <section id="next-lyric-review" class="guided-review" hidden><h3>다음 가사가 나올 때 한 번만 눌러주세요</h3><p class="hint">① 재생해서 듣다가 ② 아래 가사가 시작되는 순간 누르세요. 두 시간은 함께 맞춰지고 바로 저장됩니다.</p><div class="next-lyric-box"><span>이 가사가 시작될 때 누르세요</span><p id="next-lyric-text"></p></div><div class="guided-actions"><button id="listen-next" disabled>① 첫 가사부터 듣기</button><button id="mark-next" class="primary" disabled>② 지금 두 번째 가사 시작 · 저장</button></div><div class="guided-position-row"><span id="guided-position" aria-label="현재 재생 위치" aria-live="off">00:00.000</span><p id="guided-status" role="status">먼저 첫 가사부터 듣기를 눌러주세요. 숫자를 입력할 필요가 없어요.</p></div></section>
+    <details class="caption-card" id="opening-boundaries"><summary>세부 조정 · 숫자로 직접 맞추기</summary><div class="boundary-content"><p class="hint">필요한 경우에만 숫자를 직접 조정하세요. 아래 시간은 노래가 끝나는 시각이 아니라, 가사 자막이 화면에 나타나고 사라지는 시각입니다. 세 번째 이후 자막 시간은 그대로 유지합니다.</p><div class="timing"><div><label for="opening-end">첫 가사 표시 끝 (초)</label><input id="opening-end" type="number" min="0" step="0.001" disabled></div><div><label for="second-start">두 번째 가사 표시 시작 (초)</label><input id="second-start" type="number" min="0" step="0.001" disabled></div></div><p id="second-lyric" class="hint"></p><p id="boundary-warning" class="hint" role="status"></p></div></details>
+    <p id="analysis-note" class="hint">분석 기준과 시간 순서를 통과하면 자동 적용합니다. 검출 결과가 애매하거나 표시 시간이 충돌하는 곡만 확인해주세요.</p>
+   </section>
+  </div>
+  <section class="panel export"><div><h2>플레이리스트 내보내기</h2><p id="export-summary">자동 완료와 검수 완료 곡을 순서대로 내보냅니다.</p></div><div class="export-controls"><select id="export-mode" aria-label="내보내기 종류"><option value="combined">통합 음악 + 통합 SRT</option><option value="individual">개별 음악 + 개별 SRT (ZIP)</option><option value="subtitles">개별 수정 SRT (ZIP)</option><option value="srt">통합 SRT만</option><option value="wav">통합 음악만 (WAV)</option></select><button id="export" class="primary" disabled>↓ 내보내기</button></div><p class="export-hint">자동 완료 곡은 추가 확인 없이 내보낼 수 있습니다. 확인할 곡이 남아 있으면 먼저 안내합니다. 통합 음악은 WAV, 개별 음악은 원본을 유지합니다.</p></section>
+  <footer><span>당신의 파일은 당신의 브라우저에.</span><span>빠른 감지: Sangeun Kum · 정밀 분리: UVR (Anjok07 · aufr33)<br>ONNX Runtime · web-audio-separation · 외부 분석 API 없음 · 권장: Chrome / Edge</span></footer>
+ </main>
+ <input id="project-file" type="file" accept=".json" hidden>
+</body></html>
