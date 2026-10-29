@@ -1,0 +1,23 @@
+{
+  "name": "musicstep",
+  "version": "1.4.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test 2026-10-29-core.test.mjs 2026-10-29-opening-v1.1.0.test.mjs 2026-10-29-fast-voice.test.mjs 2026-10-29-singing-features.test.mjs 2026-10-29-review-policy.test.mjs 2026-10-29-capture-boundary.test.mjs 2026-10-29-social-meta.test.mjs",
+    "test:browser": "node 2026-10-29-v1.4.0-browser-test.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-audio": "0.10.32",
+    "fflate": "0.8.3",
+    "onnxruntime-web": "1.31.1",
+    "web-audio-separation": "0.3.1"
+  },
+  "devDependencies": {
+    "playwright": "1.56.1",
+    "vite": "7.3.7"
+  }
+}

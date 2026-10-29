@@ -1,0 +1,10 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { correctOpening, openingCandidate } from './2026-10-29-opening-v1.1.0.mjs';
+const cues=[{start:.08,end:4.548,text:'first'},{start:4.548,end:23.217,text:'second'},{start:23.217,end:29.202,text:'third'}];
+test('opening boundary repair allows onset later than malformed first end and preserves third cue',()=>{const out=correctOpening(cues,{start:12,end:17,secondStart:17},40);assert.deepEqual(out[0],{start:12,end:17,text:'first'});assert.deepEqual(out[1],{start:17,end:23.217,text:'second'});assert.deepEqual(out[2],cues[2]);assert.equal(cues[0].end,4.548);});
+test('boundary repair rejects overlaps, reversed intervals and boundaries beyond song',()=>{for(const draft of [{start:12,end:10,secondStart:17},{start:12,end:18,secondStart:17},{start:12,end:25,secondStart:25}])assert.throws(()=>correctOpening(cues,draft,40));assert.throws(()=>correctOpening(cues,{start:12,end:17,secondStart:17},15));});
+test('separated-vocal onset requires sustained energy and rejects a short intro click',()=>{const frames=Array.from({length:200},(_,i)=>({time:i*.1,rms:i===80?.03:i>=120?.04:.0001,mix:.1}));const r=openingCandidate(frames);assert.ok(r.start>=11.8&&r.start<=12.1);assert.equal(r.status,'review');});
+test('silence and near-constant separation leakage have no onset',()=>{assert.equal(openingCandidate(Array.from({length:200},(_,i)=>({time:i*.1,rms:0,mix:.1}))).start,null);assert.equal(openingCandidate(Array.from({length:200},(_,i)=>({time:i*.1,rms:.01,mix:.1}))).start,null);});
+test('a vocal present from the start is not suppressed by baseline estimation',()=>{assert.equal(openingCandidate(Array.from({length:100},(_,i)=>({time:i*.1,rms:.08,mix:.1}))).start,0);});
+test('sub-millisecond reversed interval after SRT rounding is rejected',()=>{assert.throws(()=>correctOpening(cues,{start:12,end:12.0004,secondStart:17},40));});

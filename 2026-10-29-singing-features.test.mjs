@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {logMel,melWeights,windowAt} from './2026-10-29-singing-features.mjs';
+test('silent log mel is finite and equals zero with max-reference dB',()=>{const feature=logMel(new Float32Array(16000));assert.equal(feature.bands,80);assert.equal(feature.count,101);assert.ok(feature.data.every(x=>Number.isFinite(x)&&x===0));});
+test('Slaney mel bands have positive weights and remove DC at their boundary',()=>{const bands=melWeights();assert.equal(bands.length,80);assert.ok(bands.every(b=>b.some(x=>x>0)));assert.ok(bands.every(b=>b[0]===0));});
+test('a stationary 1kHz sinusoid puts peak energy in matching mel band',()=>{const audio=Float32Array.from({length:16000},(_,i)=>.5*Math.sin(2*Math.PI*1000*i/16000));const feature=logMel(audio);const frame=Array.from(feature.data.subarray(50*80,51*80));const index=frame.indexOf(Math.max(...frame));assert.ok(index>=24&&index<=30,index);assert.ok(Math.max(...feature.data)<=.00001);assert.ok(Math.min(...feature.data)>=-80);});
+test('model window is centered, chronological, and has 75 by 80 values',()=>{const feature={count:100,bands:80,data:Float32Array.from({length:8000},(_,i)=>i)};const window=windowAt(feature,50);assert.equal(window.length,6000);assert.equal(window[0],13*80);assert.equal(window[5999],87*80+79);});
+test('JavaScript frontend matches independent NumPy FFT and Slaney reference',()=>{const fixture=JSON.parse(fs.readFileSync(new URL('./2026-10-29-feature-golden.json',import.meta.url),'utf8'));const audio=Float32Array.from({length:16000},(_,i)=>.3*Math.sin(2*Math.PI*440*i/16000)+.2*Math.sin(2*Math.PI*1300*i/16000));const feature=logMel(audio);let maxError=0;fixture.frames.forEach((frame,index)=>{for(let b=0;b<80;b++)maxError=Math.max(maxError,Math.abs(feature.data[frame*80+b]-fixture.values[index][b]));});assert.ok(maxError<.003,maxError);});
