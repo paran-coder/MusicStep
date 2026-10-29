@@ -1,8 +1,8 @@
-# MusicStep-v1.4.1 — GitHub · Vercel 업로드
+# MusicStep-v1.4.2 — GitHub · Vercel 업로드
 
 ## 올릴 파일
 
-`2026-10-29-MusicStep-v1.4.1-github/` 안의 파일과 폴더 전체가 저장소 내용입니다. 이 폴더 자체를 한 단계 더 감싸지 말고, 그 안의 `package.json`, `index.html`, `public/` 등이 저장소 최상위에 오게 올리세요. ZIP 파일 자체를 저장소에 올리는 방식은 배포용 소스 업로드가 아닙니다.
+`2026-10-29-MusicStep-v1.4.2-github/` 안의 파일과 폴더 전체가 저장소 내용입니다. 이 폴더 자체를 한 단계 더 감싸지 말고, 그 안의 `package.json`, `index.html`, `public/` 등이 저장소 최상위에 오게 올리세요. ZIP 파일 자체를 저장소에 올리는 방식은 배포용 소스 업로드가 아닙니다.
 
 샘플 음악·자막, 실제 파일명과 진단 결과, Python 변환 환경, node_modules, dist, 과거 버전 ZIP은 제외했습니다. 빠른 보컬 감지와 선택형 정밀 분석에 쓰는 두 모델과 ONNX 런타임·라이선스만 포함합니다. 과거 YAMNet·Silero 모델과 MediaPipe 런타임은 현재 UI에서 쓰지 않으므로 이 폴더에 없습니다. 원래 작업 폴더의 파일은 보존합니다.
 
@@ -15,7 +15,7 @@
 git init
 git add .
 git status --short
-git commit -m "Release MusicStep v1.4.1"
+git commit -m "Release MusicStep v1.4.2"
 git branch -M main
 # GitHub에서 빈 저장소를 만든 후 아래 주소를 실제 주소로 바꿉니다.
 git remote add origin https://github.com/YOUR-ACCOUNT/YOUR-REPOSITORY.git
@@ -30,7 +30,7 @@ Vercel에서 해당 GitHub 저장소를 Import합니다. Root Directory는 저�
 
 Vercel의 System Environment Variables 접근을 켜세요. 빌드 시 `VERCEL_PROJECT_PRODUCTION_URL`을 읽어 `og:image`, Twitter 이미지, `og:url`, canonical에 실제 HTTPS 서비스 주소를 넣습니다. 별도 도메인을 고정하고 싶다면 Vercel 환경변수 **SITE_URL=https://실제도메인**을 설정하고 다시 배포하세요. 경로·쿼리가 없는 HTTPS 도메인 주소를 사용합니다. `.env`나 비밀 키를 저장소에 올릴 필요가 없습니다.
 
-우선순위: SITE_URL → VERCEL_PROJECT_PRODUCTION_URL → VERCEL_URL. 일반 로컬 빌드는 공개 주소를 지어내지 않고 `/og-image.png`를 사용합니다. Vercel 환경에서 주소를 전혀 받지 못하면 잘못된 공유 태그로 배포하지 않도록 빌드를 중단하고 설정 방법을 표시합니다.
+우선순위: SITE_URL → VERCEL_PROJECT_PRODUCTION_URL → VERCEL_URL. 환경변수가 없으면 확인된 실서비스 주소 https://music-step.vercel.app 을 사용합니다. 로컬 빌드에서도 공유 태그가 이 주소를 사용합니다.
 
 ## 배포 후 확인
 

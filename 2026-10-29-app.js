@@ -10,7 +10,7 @@ const statusText={pending:'분석 대기',review:'검수 필요',auto:'자동 �
 const current=()=>state.tracks.find(t=>t.id===state.selected);
 const secs=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const safeName=name=>name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').slice(0,120)||'track';
-const dated='2026-10-29-MusicStep-v1.4.1';
+const dated='2026-10-29-MusicStep-v1.4.2';
 function notify(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);}
 function setBusy(value){state.busy=value;for(const el of [$('files'),$('import-files'),$('empty-import'),$('load-project'),$('project-file'),$('add-pairs'),$('gap'),$('save-project'),$('analysis-method'),$('analysis-range')])el.disabled=value;$('cancel').hidden=!value||!state.abort;renderList();renderEditor();}
 function badge(status){const el=document.createElement('span');el.className='badge '+(isComplete(status)?'done':status==='error'?'error':['review','dirty'].includes(status)?'review':'');el.textContent=statusText[status]||status;return el;}
@@ -77,6 +77,7 @@ function saveReviewedTimes(t){
 function getGap(){const n=Number($('gap').value);return Number.isFinite(n)&&n>=0&&n<=60?n:0;}
 function waveEnd(t){return $('wave-range').value==='all'?t.duration:Math.min(t.duration,Number($('wave-range').value));}
 function draw(){
+ updateWaveCursor();
  const canvas=$('waveform'),rect=canvas.getBoundingClientRect(),dpr=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.round(rect.width*dpr));canvas.height=200*dpr;const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);const width=rect.width,height=200,t=current();ctx.clearRect(0,0,width,height);ctx.strokeStyle='#2b3139';ctx.lineWidth=1;
  for(let i=1;i<6;i++){ctx.beginPath();ctx.moveTo(width*i/6,0);ctx.lineTo(width*i/6,height);ctx.stroke();}ctx.beginPath();ctx.moveTo(0,100);ctx.lineTo(width,100);ctx.stroke();if(!t)return;
  const end=waveEnd(t);$('wave-axis').lastElementChild.textContent=secs(end);
@@ -91,7 +92,14 @@ function setDraft(value){const t=current();if(!t||state.busy)return;if(!Number.i
 $('opening-end').onchange=()=>{const t=current();if(!t||state.busy)return;t.draftEnd=Number($('opening-end').value);draftChanged(t);};
 $('second-start').onchange=()=>{const t=current();if(!t||state.busy)return;t.draftSecond=Number($('second-start').value);draftChanged(t);};
 $('start').onchange=()=>setDraft(Number($('start').value));$('start-slider').oninput=()=>setDraft(Number($('start-slider').value));$('minus').onclick=()=>setDraft(current().draft-.1);$('plus').onclick=()=>setDraft(current().draft+.1);
-let dragging=false;$('waveform').onpointerdown=e=>{if(!current()||state.busy)return;dragging=true;e.target.setPointerCapture(e.pointerId);movePointer(e);};$('waveform').onpointermove=e=>{if(dragging)movePointer(e);};$('waveform').onpointerup=()=>dragging=false;$('waveform').onpointercancel=()=>dragging=false;
+let dragging=false,wavePointer=null;
+function updateWaveCursor(){const canvas=$('waveform'),t=current();if(!t||state.busy){dragging=false;canvas.style.cursor='default';return;}const rect=canvas.getBoundingClientRect(),end=waveEnd(t);const near=wavePointer!==null&&rect.width>0&&end>0&&t.draft<=end&&Math.abs(wavePointer-rect.left-Math.max(1,t.draft/end*rect.width))<=8;canvas.style.cursor=dragging||near?'ew-resize':'crosshair';}
+$('waveform').onpointerdown=e=>{if(e.button!==0||!current()||state.busy)return;wavePointer=e.clientX;dragging=true;e.target.setPointerCapture(e.pointerId);movePointer(e);updateWaveCursor();};
+$('waveform').onpointermove=e=>{wavePointer=e.clientX;if(dragging)movePointer(e);updateWaveCursor();};
+$('waveform').onpointerup=e=>{dragging=false;wavePointer=e.clientX;updateWaveCursor();};
+$('waveform').onpointercancel=()=>{dragging=false;wavePointer=null;updateWaveCursor();};
+$('waveform').onlostpointercapture=()=>{dragging=false;updateWaveCursor();};
+$('waveform').onpointerleave=()=>{if(!dragging){wavePointer=null;updateWaveCursor();}};
 function movePointer(e){const rect=$('waveform').getBoundingClientRect();setDraft((e.clientX-rect.left)/rect.width*waveEnd(current()));}
 $('wave-range').onchange=draw;new ResizeObserver(draw).observe($('waveform'));
 $('apply').onclick=()=>{try{const t=current();const issue=explainOpening(t.cues,{start:t.draft,end:t.draftEnd,secondStart:t.draftSecond},t.duration);if(issue){notify(issue.title,true);return;}saveReviewedTimes(t);notify(`${t.file.name}: 확인한 가사 자막 표시 시간을 저장했습니다. 세 번째 이후 자막 시간은 그대로입니다.`);}catch(e){notify('가사 자막 표시 시간을 확인해주세요. '+e.message,true);}};
@@ -159,7 +167,7 @@ $('export').onclick=async()=>{let sink;try{const tracks=reviewedTracks(),gap=get
  else{const entries=[];tracks.forEach((t,i)=>{if(mode==='individual')entries.push({name:entryName(t,i,'.'+t.file.name.split('.').pop().toLowerCase()),data:t.file});entries.push({name:entryName(t,i,'.srt'),data:formatSrt(t.cues)});});await exportZip(entries,sink,state.abort.signal);}
  if(state.abort.signal.aborted)throw new DOMException('취소되었습니다.','AbortError');await sink.close();sink=null;notify('내보내기를 완료했습니다. 음악과 자막은 브라우저에서만 처리했습니다.');
  }catch(e){if(sink)try{await sink.abort();}catch{}notify(e.name==='AbortError'?'내보내기를 취소했습니다.':e.message,e.name!=='AbortError');}finally{state.abort=null;setBusy(false);}};
-$('save-project').onclick=()=>{if(!state.tracks.length&&!state.project.length){notify('저장할 작업이 없습니다.',true);return;}const data={version:2,app:'MusicStep-v1.4.1',gap:getGap(),tracks:[...state.tracks.map(t=>({name:t.file.name,size:t.file.size,srtName:t.srtName,srt:t.raw,start:t.applied,end:t.appliedEnd,secondStart:t.appliedSecond})),...state.project.map(t=>({...t,end:t.end??parseSrt(t.srt)[0].end,secondStart:t.secondStart??parseSrt(t.srt)[1]?.start??null}))]};download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),`${dated}-project.json`);notify('적용한 시작·종료·둘째 시작과 자막을 로컬 JSON으로 저장했습니다. 음악 파일은 포함하지 않습니다.');};
+$('save-project').onclick=()=>{if(!state.tracks.length&&!state.project.length){notify('저장할 작업이 없습니다.',true);return;}const data={version:2,app:'MusicStep-v1.4.2',gap:getGap(),tracks:[...state.tracks.map(t=>({name:t.file.name,size:t.file.size,srtName:t.srtName,srt:t.raw,start:t.applied,end:t.appliedEnd,secondStart:t.appliedSecond})),...state.project.map(t=>({...t,end:t.end??parseSrt(t.srt)[0].end,secondStart:t.secondStart??parseSrt(t.srt)[1]?.start??null}))]};download(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}),`${dated}-project.json`);notify('적용한 시작·종료·둘째 시작과 자막을 로컬 JSON으로 저장했습니다. 음악 파일은 포함하지 않습니다.');};
 $('load-project').onclick=()=>$('project-file').click();$('project-file').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{if(file.size>10*1024*1024)throw Error('프로젝트 JSON은 10MB 이하만 열 수 있습니다.');const p=validateProject(JSON.parse(await file.text()));if(state.tracks.length&&!confirm('현재 목록을 비우고 저장한 작업을 여시겠습니까? 저장하지 않은 작업은 사라집니다.'))return;state.tracks=[];state.unpaired=[];state.subtitles=[];state.project=p.tracks.map((t,restoreOrder)=>({...t,restoreOrder}));$('gap').value=p.gap;select(null);renderPairing();notify(`작업을 열었습니다. 저장한 음악 ${p.tracks.length}개를 다시 선택하세요. 파일명과 크기를 확인한 후 시작점을 복원합니다. 복원 순서는 저장된 곡 순서로 정렬됩니다.`);}catch(e){notify(e.message,true);}};
 window.addEventListener('beforeunload',e=>{if(state.tracks.length||state.busy){e.preventDefault();e.returnValue='';}});
 renderList();renderEditor();

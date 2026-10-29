@@ -1,0 +1,30 @@
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {wavHeader,pcm16} from './2026-10-29-core.mjs';
+const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const checks=[];
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1050}});
+ await page.goto('http://127.0.0.1:5173/');
+ const wave=page.locator('#waveform'),cursor=()=>wave.evaluate(e=>getComputedStyle(e).cursor);
+ await wave.hover();assert.equal(await cursor(),'default');checks.push('no music: default');
+ const frames=44100*12,a=Float32Array.from({length:frames},(_,i)=>.1*Math.sin(i*.1));
+ await page.locator('#files').setInputFiles([{name:'cursor.wav',mimeType:'audio/wav',buffer:Buffer.concat([wavHeader(frames),pcm16([a,a],0,frames)])},{name:'cursor.srt',mimeType:'text/plain',buffer:Buffer.from('1\n00:00:03,000 --> 00:00:06,000\n첫 가사\n\n2\n00:00:07,000 --> 00:00:10,000\n다음 가사\n')}]);
+ await page.waitForFunction(()=>document.querySelector('#track-count').textContent==='1'&&!document.querySelector('#files').disabled);
+ const r=await wave.boundingBox(),x=r.x+r.width*3/12,y=r.y+80;
+ await page.mouse.move(x,y);assert.equal(await cursor(),'ew-resize');checks.push('yellow line: ew-resize');
+ await page.mouse.move(x+7,y);assert.equal(await cursor(),'ew-resize');
+ await page.mouse.move(x+12,y);assert.equal(await cursor(),'crosshair');checks.push('outside 8px hit area: crosshair');
+ await page.mouse.move(x,y);await page.mouse.down();await page.mouse.move(r.x+r.width*.4,y,{steps:5});assert.equal(await cursor(),'ew-resize');assert.ok(Number(await page.locator('#start').inputValue())>4);checks.push('drag moves timestamp and retains resize cursor');
+ await page.mouse.move(r.x+r.width+30,y);assert.equal(await cursor(),'ew-resize');checks.push('pointer capture retains cursor outside waveform');
+ await page.mouse.up();await page.mouse.move(r.x+20,y);assert.equal(await cursor(),'crosshair');checks.push('release restores hover cursor');
+ await wave.dispatchEvent('pointercancel',{pointerId:1});assert.equal(await cursor(),'crosshair');checks.push('cancel resets drag state');
+ await page.route('**/models/*singing*',async route=>{await new Promise(r=>setTimeout(r,1500));await route.abort().catch(()=>{});});
+ await page.locator('#analyze-one').click();await page.waitForFunction(()=>document.querySelector('#analyze-one').disabled);
+ assert.equal(await cursor(),'default');await page.locator('#cancel').click();await page.waitForFunction(()=>!document.querySelector('#analyze-one').disabled);checks.push('busy: default; cancellation restores enabled state');
+ assert.equal(await page.locator('meta[property="og:image"]').getAttribute('content'),'https://music-step.vercel.app/og-image.png');
+ assert.equal(await page.locator('link[rel="canonical"]').getAttribute('href'),'https://music-step.vercel.app/');checks.push('confirmed deployment domain in OG/canonical');
+ const out='2026-10-29-work/2026-10-29-current-test-results';await fs.mkdir(out,{recursive:true});await fs.writeFile(out+'/2026-10-29-cursor-results.json',JSON.stringify({pass:checks.length,checks},null,2));
+ console.log(JSON.stringify({pass:checks.length,checks},null,2));
+}finally{await browser.close();}
