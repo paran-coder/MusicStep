@@ -10,7 +10,7 @@ const statusText={pending:'분석 대기',review:'검수 필요',auto:'자동 �
 const current=()=>state.tracks.find(t=>t.id===state.selected);
 const secs=t=>`${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
 const safeName=name=>name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_').slice(0,120)||'track';
-const dated='2026-10-29-MusicStep-v1.5.0';
+const dated='2026-10-29-MusicStep-v1.6.0';
 function notify(message,error=false){$('notice').textContent=message;$('notice').classList.toggle('error',error);}
 function setBusy(value){state.busy=value;for(const el of [$('files'),$('import-files'),$('empty-import'),$('load-project'),$('project-file'),$('add-pairs'),$('gap'),$('save-project'),$('analysis-method'),$('analysis-range')])el.disabled=value;$('cancel').hidden=!value||!state.abort;renderList();renderEditor();}
 function badge(status){const el=document.createElement('span');el.className='badge '+(isComplete(status)?'done':status==='error'?'error':['review','dirty'].includes(status)?'review':'');el.textContent=statusText[status]||status;return el;}
@@ -116,7 +116,7 @@ $('waveform').onpointercancel=()=>{dragging=null;wavePointer=null;updateWaveCurs
 $('waveform').onlostpointercapture=()=>{dragging=null;updateWaveCursor();};
 $('waveform').onpointerleave=()=>{if(!dragging){wavePointer=null;updateWaveCursor();}};
 $('waveform').onkeydown=e=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(e.key)&&current()&&!state.busy){e.preventDefault();seekTo(e.key==='Home'?0:e.key==='End'?current().duration:audio.currentTime+(e.key==='ArrowLeft'?-1:1)*(e.shiftKey?0.1:1));}};
-document.addEventListener('keydown',e=>{if(e.code!=='Space'||e.repeat||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.isComposing||e.defaultPrevented||!current()||state.busy)return;const path=e.composedPath();if(path.some(el=>el instanceof Element&&(el.matches('input,textarea,select,button,a,audio,video,[role="button"],[role="slider"]')||el.isContentEditable)))return;e.preventDefault();if(audio.paused){audio.play().catch(err=>notify('재생할 수 없습니다: '+err.message,true));}else audio.pause();});
+document.addEventListener('keydown',e=>{if(location.hash.startsWith('#usage')||e.code!=='Space'||e.repeat||e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||e.isComposing||e.defaultPrevented||!current()||state.busy)return;const path=e.composedPath();if(path.some(el=>el instanceof Element&&(el.matches('input,textarea,select,button,a,audio,video,[role="button"],[role="slider"]')||el.isContentEditable)))return;e.preventDefault();if(audio.paused){audio.play().catch(err=>notify('재생할 수 없습니다: '+err.message,true));}else audio.pause();});
 $('wave-range').onchange=draw;new ResizeObserver(draw).observe($('waveform'));
 $('apply').onclick=()=>{try{const t=current();const issue=explainOpening(t.cues,{start:t.draft,end:t.draftEnd,secondStart:t.draftSecond},t.duration);if(issue){notify(issue.title,true);return;}saveReviewedTimes(t);notify(`${t.file.name}: 확인한 가사 자막 표시 시간을 저장했습니다. 세 번째 이후 자막 시간은 그대로입니다.`);}catch(e){notify('가사 자막 표시 시간을 확인해주세요. '+e.message,true);}};
 $('listen-next').onclick=async()=>{const t=current();if(!t?.cues[1]||state.busy)return;try{state.preview=false;audio.currentTime=Math.max(0,t.draft-.6);await audio.play();updateGuidedControls();}catch(e){notify('재생을 시작하지 못했습니다. 음악을 다시 선택한 뒤 재생해주세요. '+e.message,true);}};

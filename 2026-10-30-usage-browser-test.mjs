@@ -1,0 +1,37 @@
+import {chromium} from 'playwright';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import {wavHeader,pcm16} from './2026-10-29-core.mjs';
+const browser=await chromium.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:true});
+const checks=[],errors=[],requests=[];const origin=process.env.MUSICSTEP_TEST_URL||'http://127.0.0.1:5173';
+const out='../2026-10-29-work/2026-10-30-v1.6.0';await fs.mkdir(out,{recursive:true});
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1050}});
+ page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
+ await page.goto(origin+'/');
+ const link=page.locator('#usage-link');assert.equal(await link.count(),1);assert.equal(await link.isVisible(),true);checks.push('header help link visible');
+ const frames=44100*12,a=new Float32Array(frames);
+ await page.locator('#files').setInputFiles([{name:'guide.wav',mimeType:'audio/wav',buffer:Buffer.concat([wavHeader(frames),pcm16([a,a],0,frames)])},{name:'guide.srt',mimeType:'text/plain',buffer:Buffer.from('1\n00:00:03,000 --> 00:00:06,000\n첫 가사\n\n2\n00:00:07,000 --> 00:00:10,000\n다음 가사\n')}]);
+ await page.waitForFunction(()=>document.querySelector('#track-count').textContent==='1'&&!document.querySelector('#files').disabled&&document.querySelector('#audio').readyState>=1);
+ await page.locator('#start').fill('4.125');await page.locator('#start').dispatchEvent('change');await page.locator('#apply').click();
+ await page.locator('#audio').evaluate(async e=>{e.currentTime=5;await e.play();});
+ const before=await page.evaluate(()=>({src:document.querySelector('#audio').src,status:document.querySelector('#selected-status').textContent,title:document.querySelector('#selected-title').textContent}));
+ await link.click();assert.match(page.url(),/#usage$/);assert.equal(await page.locator('#usage-page').isVisible(),true);assert.equal(await page.locator('#editor-page').isVisible(),false);
+ assert.equal(await page.locator('#audio').evaluate(e=>e.paused),true);checks.push('help navigation pauses audio and hides editor');
+ assert.equal(await page.evaluate(()=>document.activeElement.id),'usage-title');checks.push('heading focus moves to help');
+ assert.ok(await page.locator('#usage-page h2').count()>=7);checks.push('all workflow sections present');
+ await page.locator('.usage-toc a[href="#usage-wave"]').click();await page.locator('#usage-wave').waitFor({state:'visible'});assert.equal(await page.locator('#editor-page').isVisible(),false);checks.push('table of contents stays in help view');
+ await page.keyboard.press('Space');assert.equal(await page.locator('#audio').evaluate(e=>e.paused),true);checks.push('help Space scroll does not play hidden music');
+ await page.screenshot({path:out+'/2026-10-30-desktop.png',fullPage:true});
+ await page.locator('#usage-back').click();await page.locator('#editor-page').waitFor({state:'visible'});assert.equal(await page.locator('#editor-page').isVisible(),true);
+ assert.equal(await page.locator('#start').inputValue(),'4.125');assert.equal(await page.locator('#track-count').textContent(),'1');
+ assert.deepEqual(await page.evaluate(()=>({src:document.querySelector('#audio').src,status:document.querySelector('#selected-status').textContent,title:document.querySelector('#selected-title').textContent})),before);
+ assert.ok(await page.locator('#audio').evaluate(e=>e.currentTime>=5));checks.push('return preserves audio file, caption time, selection, review and playback position');
+ await page.goBack();await page.locator('#usage-page').waitFor({state:'visible'});assert.equal(await page.locator('#usage-page').isVisible(),true);await page.goForward();await page.locator('#editor-page').waitFor({state:'visible'});assert.equal(await page.locator('#editor-page').isVisible(),true);checks.push('browser back and forward preserve views');
+ await page.setViewportSize({width:390,height:844});assert.equal(await link.isVisible(),true);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await link.click();await page.locator('#usage-page').waitFor({state:'visible'});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:out+'/2026-10-30-mobile.png',fullPage:true});checks.push('mobile header and help fit screen');
+ await page.goto(origin+'/#usage');assert.equal(await page.locator('#usage-page').isVisible(),true);await page.reload();assert.equal(await page.locator('#usage-page').isVisible(),true);checks.push('direct help link and reload');
+ await page.locator('#usage-back').click();await page.locator('#editor-page').waitFor({state:'visible'});assert.equal(await page.locator('#track-count').textContent(),'0');checks.push('fresh help entry returns to empty editor without error');
+ assert.deepEqual(errors,[]);assert.deepEqual(requests.filter(url=>!url.startsWith(origin+'/')&&!url.startsWith('blob:')),[]);checks.push('no page exceptions or external requests');
+ const result={origin,pass:checks.length,checks,errors};await fs.writeFile(out+'/2026-10-30-usage-results.json',JSON.stringify(result,null,2));console.log(JSON.stringify(result,null,2));
+}finally{await browser.close();}
